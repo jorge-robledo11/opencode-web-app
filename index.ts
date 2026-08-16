@@ -17,6 +17,32 @@ function paint(color: keyof typeof ANSI, text: string): string {
   return `${ANSI[color]}${text}${ANSI.reset}`;
 }
 
+const WEATHER_CODE: Record<number, string> = {
+  0: "Despejado",
+  1: "Principalmente despejado",
+  2: "Parcialmente nublado",
+  3: "Nublado",
+  45: "Niebla",
+  48: "Niebla con escarcha",
+  51: "Llovizna ligera",
+  53: "Llovizna",
+  55: "Llovizna densa",
+  61: "Lluvia ligera",
+  63: "Lluvia",
+  65: "Lluvia fuerte",
+  71: "Nieve ligera",
+  73: "Nieve",
+  75: "Nieve fuerte",
+  80: "Chubascos ligeros",
+  81: "Chubascos",
+  82: "Chubascos fuertes",
+  95: "Tormenta",
+  96: "Tormenta con granizo ligero",
+  99: "Tormenta con granizo fuerte",
+};
+
+const WEEKDAYS_ES = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+
 type City = {
   name: string;
   latitude: number;
@@ -41,6 +67,22 @@ type GeoResponse = {
 
 type ForecastResponse = {
   current?: { temperature_2m?: number };
+};
+
+type DailyForecastResponse = {
+  daily?: {
+    time?: string[];
+    temperature_2m_max?: number[];
+    temperature_2m_min?: number[];
+    weather_code?: number[];
+  };
+};
+
+type DailyForecast = {
+  time: string[];
+  tempMax: number[];
+  tempMin: number[];
+  code: number[];
 };
 
 async function loadConfig(): Promise<Config> {
@@ -89,6 +131,23 @@ async function currentTemp(lat: number, lon: number): Promise<number> {
   return t;
 }
 
+async function dailyForecast(lat: number, lon: number): Promise<DailyForecast> {
+  const url = `${FORECAST_URL}?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,weather_code&forecast_days=7&timezone=auto`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = (await res.json()) as DailyForecastResponse;
+  const d = data.daily;
+  if (!d || !d.time || !d.temperature_2m_max || !d.temperature_2m_min || !d.weather_code) {
+    throw new Error("no daily forecast in response");
+  }
+  return {
+    time: d.time,
+    tempMax: d.temperature_2m_max,
+    tempMin: d.temperature_2m_min,
+    code: d.weather_code,
+  };
+}
+
 function formatTemp(celsius: number, units: "C" | "F"): string {
   const text = units === "F"
     ? `${((celsius * 9) / 5 + 32).toFixed(1)} °F`
@@ -109,6 +168,7 @@ function renderMenu(config: Config): string {
   3. Buscar y agregar ciudad
   4. Eliminar ciudad
   5. Establecer ciudad default
+  6. Pronóstico 7 días (ciudad default)
   8. Ajustes (°${config.units})
   9. Salir
 ════════════════════════════════════════`;
@@ -133,6 +193,37 @@ async function showDefaultWeather(config: Config): Promise<void> {
   try {
     const temp = await currentTemp(city.latitude, city.longitude);
     console.log(`${cityLabel(city)}: ${formatTemp(temp, config.units)}`);
+  } catch (e) {
+    console.log(paint("red", `Error de red: ${(e as Error).message}`));
+  }
+}
+
+async function show7DayForecast(config: Config): Promise<void> {
+  if (!config.defaultCity) {
+    console.log(paint("red", "No hay ciudad por defecto. Usa la opción 5 para establecer una."));
+    return;
+  }
+  const city = config.cities.find((c) => c.name === config.defaultCity);
+  if (!city) {
+    console.log(paint("red", `Ciudad default "${config.defaultCity}" no encontrada. Restablece con la opción 5.`));
+    return;
+  }
+  try {
+    const forecast = await dailyForecast(city.latitude, city.longitude);
+    console.log(`Pronóstico 7 días — ${cityLabel(city)}:`);
+    forecast.time.forEach((iso, i) => {
+      const date = new Date(`${iso}T00:00:00`);
+      const day = WEEKDAYS_ES[date.getDay()] ?? "";
+      const max = forecast.tempMax[i]?.toFixed(1) ?? "?";
+      const min = forecast.tempMin[i]?.toFixed(1) ?? "?";
+      const desc = typeof forecast.code[i] === "number"
+        ? (WEATHER_CODE[forecast.code[i] as number] ?? "—")
+        : "—";
+      const dayLabel = i === 0
+        ? `Hoy (${day} ${date.getDate().toString().padStart(2, "0")})`
+        : `${day} ${date.getDate().toString().padStart(2, "0")}`;
+      console.log(`  ${dayLabel}: ${paint("yellow", `${max} / ${min} °C`)} — ${desc}`);
+    });
   } catch (e) {
     console.log(paint("red", `Error de red: ${(e as Error).message}`));
   }
@@ -242,6 +333,9 @@ async function main(): Promise<void> {
         break;
       case "5":
         await setDefaultCity(config);
+        break;
+      case "6":
+        await show7DayForecast(config);
         break;
       case "8":
         await toggleUnits(config);
