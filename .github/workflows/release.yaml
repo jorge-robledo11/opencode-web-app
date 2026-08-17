@@ -1,0 +1,160 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      pkg_version: ${{ steps.compare.outputs.pkg }}
+      should_release: ${{ steps.compare.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache Bun
+        id: cache-bun
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/bin/bun
+          key: bun-v1.3.14-${{ runner.os }}-${{ runner.arch }}
+          restore-keys: bun-v1.3.14-
+
+      - name: Install Bun (cache miss)
+        if: steps.cache-bun.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL -o bun.zip "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip"
+          mkdir -p "$HOME/.bun/bin"
+          unzip -o bun.zip -d "$HOME/.bun/bin"
+          chmod +x "$HOME/.bun/bin/bun"
+
+      - name: Add Bun to PATH
+        run: echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+
+      - name: Compare versions
+        id: compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG=$(jq -r .version package.json)
+          LATEST=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -1 | sed 's/^v//' || echo "")
+          LATEST=${LATEST:-0.0.0}
+          if [ "$(printf 'v%s\nv%s\n' "$LATEST" "$PKG" | sort -V | tail -1)" = "v$PKG" ] && [ "v$PKG" != "v$LATEST" ]; then
+            SHOULD="true"
+          else
+            SHOULD="false"
+          fi
+          {
+            echo "pkg=$PKG"
+            echo "latest=$LATEST"
+            echo "should_release=$SHOULD"
+          } >> "$GITHUB_OUTPUT"
+          echo "pkg=$PKG latest=$LATEST should_release=$SHOULD"
+
+  build:
+    needs: decide
+    if: needs.decide.outputs.should_release == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            outfile: weather
+            artifact_name: weather-linux-x64
+            binary_name: weather-linux-x64
+          - os: macos-latest
+            outfile: weather
+            artifact_name: weather-macos-x64
+            binary_name: weather-macos-x64
+          - os: windows-latest
+            outfile: weather.exe
+            artifact_name: weather-windows-x64
+            binary_name: weather-windows-x64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Bun
+        id: cache-bun
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/bin/bun
+          key: bun-v1.3.14-${{ runner.os }}-${{ runner.arch }}
+          restore-keys: bun-v1.3.14-${{ runner.os }}-
+
+      - name: Install Bun (cache miss)
+        if: steps.cache-bun.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.os }}" in
+            ubuntu-latest)  ASSET="bun-linux-x64.zip" ;;
+            macos-latest)   ASSET="bun-darwin-x64.zip" ;;
+            windows-latest) ASSET="bun-windows-x64.zip" ;;
+          esac
+          curl -fsSL -o bun.zip "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/${ASSET}"
+          mkdir -p "$HOME/.bun/bin"
+          unzip -o bun.zip -d "$HOME/.bun/bin"
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            chmod +x "$HOME/.bun/bin/bun"
+          fi
+
+      - name: Add Bun to PATH
+        run: echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+
+      - name: Rename + chmod
+        shell: bash
+        run: |
+          set -euo pipefail
+          mv "${{ matrix.outfile }}" "${{ matrix.binary_name }}"
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            chmod +x "${{ matrix.binary_name }}"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.binary_name }}
+          if-no-files-found: error
+
+  release:
+    needs: [decide, build]
+    if: needs.decide.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create tag + release
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.decide.outputs.pkg_version }}"
+          TAG="v${VERSION}"
+          gh release create "$TAG" \
+            ./dist/weather-linux-x64/weather-linux-x64 \
+            ./dist/weather-macos-x64/weather-macos-x64 \
+            ./dist/weather-windows-x64/weather-windows-x64.exe \
+            --generate-notes \
+            --title "Release ${TAG}"
