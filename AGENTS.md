@@ -30,7 +30,7 @@ Bun CLI app (`02-weather`). Interactive Weather CLI from `README.md`, structured
   - `storage/` — `citiesStorage.test.ts`, `settingsStorage.test.ts`.
   - `api/` — `geocoding.test.ts`, `weather.test.ts` (mock `fetch`).
   - `presentation/` — `menu.test.ts`, `output.test.ts` (spy `console.log`), `input.test.ts` (mock `prompt`).
-  - `actions/` — integration tests per action (`addCity`, `removeCity`, `setDefaultCity`, `toggleUnits`, `getDefaultWeather`, `getAllWeather`, `getWeeklyForecast`, `listCities`) using `tests/helpers.ts` utilities.
+  - `actions/` — integration tests, one `.test.ts` per src file. `getWeather.test.ts` contains `describe("getDefaultWeather")` + `describe("getAllWeather")`; `getForecast.test.ts` covers `getWeeklyForecast`; `addCity`, `removeCity`, `setDefaultCity`, `toggleUnits`, `listCities` each get their own file. All use `tests/helpers.ts` utilities.
 - `tests/helpers.ts` centralizes the test infrastructure:
   - Top-level `mock.module("../src/utils/constants.ts", ...)` redirects `CONFIG_PATH` to `tests/.tmp/config.json` so persistence tests never touch `~/.config/`. Other constant exports (`GEO_URL`, `FORECAST_URL`, `WEEKDAYS_ES`) are duplicated in the helper; `constants.test.ts` guards that the real values match.
   - `installFetchMock(impl)` / `installPromptMock(impl)` / `installConsoleSpy()` — each returns a `restore` fn to be called in `afterEach`.
