@@ -30,7 +30,7 @@ jobs:
           set -euo pipefail
           curl -fsSL -o bun.zip "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip"
           mkdir -p "$HOME/.bun/bin"
-          unzip -o bun.zip -d "$HOME/.bun/bin"
+          unzip -jo bun.zip -d "$HOME/.bun/bin"
           chmod +x "$HOME/.bun/bin/bun"
 
       - name: Add Bun to PATH
@@ -100,7 +100,7 @@ jobs:
           esac
           curl -fsSL -o bun.zip "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/${ASSET}"
           mkdir -p "$HOME/.bun/bin"
-          unzip -o bun.zip -d "$HOME/.bun/bin"
+          unzip -jo bun.zip -d "$HOME/.bun/bin"
           if [ "${{ runner.os }}" != "Windows" ]; then
             chmod +x "$HOME/.bun/bin/bun"
           fi
