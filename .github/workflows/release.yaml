@@ -11,13 +11,13 @@ jobs:
       pkg_version: ${{ steps.compare.outputs.pkg }}
       should_release: ${{ steps.compare.outputs.should_release }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Cache Bun
         id: cache-bun
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.bun/bin/bun
           key: bun-v1.3.14-${{ runner.os }}-${{ runner.arch }}
@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL -o bun.zip "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip"
+          curl -fsSL -o bun.zip "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64-baseline.zip"
           mkdir -p "$HOME/.bun/bin"
           unzip -jo bun.zip -d "$HOME/.bun/bin"
           chmod +x "$HOME/.bun/bin/bun"
@@ -78,11 +78,11 @@ jobs:
             binary_name: weather-windows-x64.exe
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache Bun
         id: cache-bun
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.bun/bin/bun
           key: bun-v1.3.14-${{ runner.os }}-${{ runner.arch }}
@@ -94,9 +94,9 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ matrix.os }}" in
-            ubuntu-latest)  ASSET="bun-linux-x64.zip" ;;
-            macos-latest)   ASSET="bun-darwin-x64.zip" ;;
-            windows-latest) ASSET="bun-windows-x64.zip" ;;
+            ubuntu-latest)  ASSET="bun-linux-x64-baseline.zip" ;;
+            macos-latest)   ASSET="bun-darwin-x64-baseline.zip" ;;
+            windows-latest) ASSET="bun-windows-x64-baseline.zip" ;;
           esac
           curl -fsSL -o bun.zip "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/${ASSET}"
           mkdir -p "$HOME/.bun/bin"
@@ -124,7 +124,7 @@ jobs:
           fi
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.binary_name }}
@@ -137,12 +137,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
 
