@@ -16,7 +16,8 @@ describe("index entry (smoke)", () => {
       new Response(proc.stderr).text(),
     ]);
     expect(exitCode).toBe(0);
-    expect(stderr).toBe("");
+    const cleanStderr = stderr.replace(/warn: CPU lacks AVX support[\s\S]*?baseline\.zip\n?/, "");
+    expect(cleanStderr).toBe("");
     expect(stdout).toContain("Salir");
   });
 });
