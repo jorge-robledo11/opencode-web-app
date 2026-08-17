@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeEach } from "bun:test";
+import { sep } from "node:path";
 import "../helpers.ts";
 import {
   resetTestConfig, TEST_CONFIG_PATH, TEST_CONFIG_DIR,
@@ -25,7 +26,7 @@ describe("settingsStorage", () => {
     await saveConfig(cfg);
     const loaded = await loadConfig();
     expect(loaded).toEqual(cfg);
-    expect(TEST_CONFIG_PATH.endsWith("tests/.tmp/config.json")).toBe(true);
+    expect(TEST_CONFIG_PATH.endsWith(`tests${sep}.tmp${sep}config.json`)).toBe(true);
   });
 
   test("JSON corrupto → defaults", async () => {
@@ -44,6 +45,6 @@ describe("settingsStorage", () => {
   });
 
   test("TEST_CONFIG_DIR existe bajo tests/.tmp", () => {
-    expect(TEST_CONFIG_DIR.endsWith("tests/.tmp")).toBe(true);
+    expect(TEST_CONFIG_DIR.endsWith(`tests${sep}.tmp`)).toBe(true);
   });
 });

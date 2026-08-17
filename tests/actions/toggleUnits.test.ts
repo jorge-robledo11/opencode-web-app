@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { homedir } from "node:os";
 import "../helpers.ts";
 import {
@@ -44,7 +44,7 @@ describe("toggleUnits", () => {
   test("persiste bajo tests/.tmp, no en ~/.config/02-weather", async () => {
     const prodPath = join(homedir(), ".config", "02-weather", "config.json");
     expect(TEST_CONFIG_PATH).not.toBe(prodPath);
-    expect(TEST_CONFIG_PATH).toContain("tests/.tmp");
+    expect(TEST_CONFIG_PATH).toContain(`tests${sep}.tmp`);
     const cfg = await loadConfig();
     await toggleUnits(cfg);
     const file = Bun.file(TEST_CONFIG_PATH);
